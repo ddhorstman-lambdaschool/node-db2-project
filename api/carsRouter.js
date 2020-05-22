@@ -1,4 +1,5 @@
 const router = require("express").Router();
+const db = require("../data/dbConfig");
 const { Validator } = require("jsonschema");
 const { catchAsync, AppError } = require("./errors");
 
@@ -9,7 +10,28 @@ const validateID = catchAsync(validateCarID);
 router.get(
   "/",
   catchAsync(async (req, res) => {
-    res.status(200).json(await knex("cars"));
+    res.status(200).json(await db("cars"));
+  })
+);
+
+router.get("/:id", validateID, (req, res) => {
+  res.status(200).json(req.car);
+});
+
+/*----------------------------------------------------------------------------*/
+/* POST
+/*----------------------------------------------------------------------------*/
+router.post(
+  "/",
+  validateCar,
+  catchAsync(async (req, res) => {
+    const [result] = await db("cars").insert(req.body, ["id"]);
+    //Extract id from PSQL's returned object
+    //Or use id returned plainly from SQLite
+    const id = result.id || result;
+    id
+      ? res.status(201).json(await db("cars").where({ id }))
+      : next(new AppError("Database error while inserting the entry", 500));
   })
 );
 
@@ -21,7 +43,7 @@ router.get(
 async function validateCarID(req, res, next) {
   const { id } = req.params;
   //cars are returned as an array - we just want the first entry
-  const [car] = await knex("cars").where({ id });
+  const [car] = await db("cars").where({ id });
   req.car = car;
   car ? next() : next(new AppError(`${id} is not a valid car ID`, 404));
 }
