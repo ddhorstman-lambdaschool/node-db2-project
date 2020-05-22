@@ -24,6 +24,7 @@ router.get("/:id", validateID, (req, res) => {
 router.post(
   "/",
   validateCar,
+  checkUniqueProperties(["vin"]),
   catchAsync(async (req, res) => {
     const [result] = await db("cars").insert(req.body, ["id"]);
     //Extract id from PSQL's returned object
@@ -80,6 +81,23 @@ function validateCar(req, res, next) {
   const v = new Validator();
   const { errors } = v.validate(req.body, carSchema);
   errors.length !== 0 ? next(errors) : next();
+}
+
+function checkUniqueProperties(properties) {
+  return catchAsync(async (req, res, next) => {
+    for (const property of properties) {
+      const bodyValue = req.body[property];
+      const [result] = await db("cars").where({ [property]: bodyValue });
+      result &&
+        next(
+          new AppError(
+            `Database already has an entry containing unique property '${property}' with value '${result[property]}'`,
+            400
+          )
+        );
+    }
+    next();
+  });
 }
 
 module.exports = router;

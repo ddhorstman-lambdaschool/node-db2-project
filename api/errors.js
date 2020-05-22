@@ -1,4 +1,5 @@
 const { ValidationError } = require("jsonschema");
+require("dotenv").config();
 
 class AppError extends Error {
   constructor(message, status) {
@@ -31,9 +32,15 @@ function errorHandling(error, req, res, next) {
     const message = error.map(e => e.stack.replace(/"/g, "'"));
     return res.status(400).json({ message });
   }
-  //handle ordinary errors
-  const { status = 500, message = "Error" } = error;
-  res.status(status).json({ message });
+  //send verbose errors if they were manually generated
+  //or if we're in a development environment
+  if (error instanceof AppError || process.env.NODE_ENV === "development") {
+    const { status = 500, message = "Error" } = error;
+    return res.status(status).json({ message });
+  }
+
+  //send uninformative errors if we're in production
+  return res.status(500).json({ message: "Server error" });
 }
 
 module.exports = { AppError, catchAsync, custom404, errorHandling };
